@@ -1,0 +1,178 @@
+
+								KUBERNETES HPA (Horizontal Pod Autoscaler)
+								~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+HPA automatically increases or decreases the number of Pods
+in a Deployment/ReplicaSet based on metrics like CPU or Memory.
+
+Instead of manually scaling:
+    kubectl scale deployment my-app --replicas=10
+
+HPA does this automatically based on load.
+
+
+HOW HPA WORKS (Simple Flow)
+----------------------------
+1. Metrics are collected from Pods (CPU/Memory).
+2. Metrics Server provides these metrics to Kubernetes.
+3. HPA checks target threshold (e.g., 70% CPU).
+4. If usage > threshold -> scale up.
+5. If usage < threshold -> scale down.
+
+
+EXAMPLE SCENARIO
+----------------
+Min Pods: 2
+Max Pods: 10
+Target CPU: 70%
+
+If CPU goes to 85% -> Pods increase
+If CPU drops to 30% -> Pods decrease
+
+
+STEP-BY-STEP SETUP (Complete Practical Guide)
+
+
+STEP 1: Install Metrics Server (Mandatory)
+------------------------------------------
+HPA will NOT work without metrics-server.
+
+Apply Metrics Server:
+    kubectl apply -f https://raw.githubusercontent.com/ksk5940/k8s-metric-server/main/metrics-server-Insecure.yaml
+	
+
+Verify:
+    kubectl get pods -n kube-system | grep metrics-server
+
+Check metrics:
+    kubectl top nodes
+    kubectl top pods
+
+If this works -> HPA ready.
+
+STEP 2: Create a Deployment (Sample App)
+----------------------------------------
+Example nginx deployment:
+
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: hpa-demo
+    spec:
+      replicas: 2
+      selector:
+        matchLabels:
+          app: hpa-demo
+      template:
+        metadata:
+          labels:
+            app: hpa-demo
+        spec:
+          containers:
+          - name: nginx
+            image: nginx
+            resources:
+              requests:
+                cpu: "100m"
+              limits:
+                cpu: "200m"
+            ports:
+            - containerPort: 80
+
+Apply:
+    kubectl apply -f deployment.yaml
+
+STEP 3: Create HPA (Inline Command Method)
+------------------------------------------
+Method 1 – Using kubectl command:
+
+    kubectl autoscale deployment hpa-demo \
+      --cpu-percent=70 \
+      --min=2 \
+      --max=10
+
+Verify:
+    kubectl get hpa
+
+Describe:
+    kubectl describe hpa hpa-demo
+
+STEP 4: Create HPA (YAML Method – Recommended)
+----------------------------------------------
+    apiVersion: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+    metadata:
+      name: hpa-demo
+    spec:
+      scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: hpa-demo
+      minReplicas: 2
+      maxReplicas: 10
+      metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          target:
+            type: Utilization
+            averageUtilization: 70
+
+Apply:
+    kubectl apply -f hpa.yaml
+
+STEP 5: Test HPA (Generate Load)
+--------------------------------
+Run temporary load pod:
+    kubectl run -it --rm load-generator --image=busybox -- /bin/sh
+
+Inside container:
+    while true; do wget -q -O- http://hpa-demo; done
+
+Watch scaling:
+    kubectl get hpa -w
+
+Check pods:
+    kubectl get pods -w
+
+You will see pods increasing automatically.
+
+
+SCALING FORMULA (How Kubernetes Decides)
+
+Desired Replicas = Current Replicas × (Current CPU / Target CPU)
+
+Example:
+Current Pods = 2
+Current CPU = 140%
+Target = 70%
+
+Calculation:
+    2 × (140/70) = 4 Pods
+
+
+IMPORTANT NOTES
+---------------
+- CPU requests must be defined
+- Metrics-server must be running
+- Works with Deployment / StatefulSet / ReplicaSet
+- Default sync period: 15 seconds
+
+
+HPA vs MANUAL SCALING
+----------------------
++--------------------------------+-----------+
+| Manual Scaling                 | HPA       |
++--------------------------------+-----------+
+| Static                         | Dynamic   |
+| Human intervention             | Automatic |
+| Risk of over/under provisioning| Optimized |
++-------------------------------+------------+
+
+
+IN PRODUCTION (Best Practice)
+-----------------------------
+- Min replicas >= 2 (high availability)
+- Set realistic CPU requests
+- Use autoscaling/v2 (supports multiple metrics)
+- Combine with Cluster Autoscaler

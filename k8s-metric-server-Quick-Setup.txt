@@ -1,0 +1,174 @@
+
+								Metrics Server Setup
+								~~~~~~~~~~~~~~~~~~~~
+
+What is Metrics Server?
+
+Metrics Server collects CPU/Memory metrics from nodes and pods.
+It is mandatory for HPA (Horizontal Pod Autoscaler) because HPA uses metrics like CPU/Memory to scale pods.
+
+If you dont want follow STEP 1, 2 & 3 use this automatically no tls enable pods will running
+
+	kubectl apply -f https://raw.githubusercontent.com/ksk5940/k8s-metric-server/main/metrics-server-Insecure.yaml
+
+STEP 0 — Prerequisites
+-----------------------
+Cluster running
+kubeadm cluster
+Calico CNI
+kube-proxy healthy
+API aggregation enabled (default in kubeadm)
+
+# Verify
+kubectl get nodes
+kubectl get pods -A
+
+
+#STEP 1 — Install Metrics Server
+--------------------------------
+# Recommended (Official Release)
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+# Verify resources
+kubectl get deploy,rs,pod,svc -n kube-system -l k8s-app=metrics-server
+
+
+#STEP 2 Troubleshooting: Metrics Server Pod Not Coming Up (Certificate Issue)
+-------------------------------------------------------------------------------
+
+#Check pod status
+kubectl get pods -n kube-system -l k8s-app=metrics-server
+
+#Check logs (most important)
+kubectl logs -n kube-system deploy/metrics-server
+
+Usually you will see errors like:
+ x509: certificate signed by unknown authority
+ cannot validate certificate
+
+
+#Add --kubelet-insecure-tls
+-----------------------------------------
+
+#Edit metrics-server deployment
+kubectl edit deploy metrics-server -n kube-system
+
+Inside spec.template.spec.containers.args, add:
+
+- --kubelet-insecure-tls
+
+
+#Final args example (like your doc)
+-------------------------------------
+yaml
+spec:
+  template:
+    spec:
+      containers:
+      - name: metrics-server
+        args:
+        - --cert-dir=/tmp
+        - --secure-port=10250
+        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --kubelet-use-node-status-port
+        - --metric-resolution=15s
+        - --kubelet-insecure-tls  #-----> This needs to be add to resolve cert errors
+
+#Restart deployment (optional but good)
+kubectl rollout restart deploy metrics-server -n kube-system
+
+#Verify rollout
+kubectl rollout status deploy metrics-server -n kube-system
+
+
+
+#STEP 3 Verify Metrics Server Working
+--------------------------------------
+
+#Check APIService status
+
+kubectl get apiservice v1beta1.metrics.k8s.io -o wide
+
+Expected:
+ AVAILABLE=True
+
+#Test metrics
+
+kubectl top nodes
+kubectl top pods -A
+
+
+If this works metrics-server is installed successfully.
+
+
+#STEP 4 — Restart Deployment
+---------------------------
+kubectl rollout restart deploy metrics-server -n kube-system
+kubectl rollout status deploy metrics-server -n kube-system
+
+
+#STEP 5 — Verify APIService
+---------------------------
+kubectl get apiservice v1beta1.metrics.k8s.io -o wide
+# Expected: AVAILABLE True
+
+
+#STEP 6 — Test Metrics
+----------------------
+kubectl top nodes
+kubectl top pods -A
+
+# Expected output:
+CPU(cores)   MEMORY(bytes)
+
+
+#STEP 7 — Optional Test HPA
+---------------------------
+kubectl autoscale deployment nginx --cpu-percent=50 --min=1 --max=5
+kubectl get hpa
+
+
+#Troubleshooting Guide
+-------------------------------
+# Check APIService
+kubectl get apiservice v1beta1.metrics.k8s.io
+kubectl describe apiservice v1beta1.metrics.k8s.io
+
+# Common issues:
++-------------------------+---------------------------+--------------------------+
+| Error                   | Cause                     | Fix                      |
++-------------------------+---------------------------+--------------------------+
+| FailedDiscoveryCheck    | Service → Pod port mismatch| Fix targetPort           |
+| x509 unknown authority  | kubelet cert issue        | add --kubelet-insecure-tls|
+| context deadline exceeded| Wrong secure-port        | Use 4443                 |
++-------------------------+---------------------------+--------------------------+
+
+
+STEP 8 — Clean Uninstall
+-------------------------
+kubectl delete -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+# If APIService remains:
+kubectl delete apiservice v1beta1.metrics.k8s.io
+
+# Verify removal:
+kubectl get apiservice | grep metrics
+
+
+
+
+Final Architecture (Your Cluster)
+----------------------------------
+kubectl top
+   ↓
+API Server
+   ↓ (aggregated API)
+metrics-server (ClusterIP 10.111.x.x)
+   ↓
+kubelet (Node IP 192.168.56.x:10250)
+
+Correct secure-port
+Correct service mapping
+Correct TLS handling
+Compatible with Calico
+HPA ready
