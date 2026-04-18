@@ -1,0 +1,3 @@
+
+
+kubectl apply -f https://raw.githubusercontent.com/ksk5940/k8s-metric-server/main/localpath_storageclass.yaml
