@@ -1,5 +1,5 @@
 # =============================================================
-# Local Path Provisioner (CORRECT FINAL VERSION)
+# Local Path Provisioner (WORKING + FIXED RBAC)
 # =============================================================
 
 apiVersion: v1
@@ -18,6 +18,7 @@ kind: ClusterRole
 metadata:
   name: local-path-provisioner-role
 rules:
+  # Core resources
   - apiGroups: [""]
     resources:
       - nodes
@@ -35,6 +36,15 @@ rules:
       - delete
       - update
       - patch
+
+  # 🔥 CRITICAL FIX (this was missing)
+  - apiGroups: ["storage.k8s.io"]
+    resources:
+      - storageclasses
+    verbs:
+      - get
+      - list
+      - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -91,7 +101,7 @@ metadata:
   name: local-path-provisioner
   namespace: local-path-storage
 spec:
-  replicas: 1   # 🔥 VERY IMPORTANT
+  replicas: 1
   selector:
     matchLabels:
       app: local-path-provisioner
