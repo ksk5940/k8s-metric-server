@@ -132,4 +132,4 @@ metadata:
     storageclass.kubernetes.io/is-default-class: "true"
 provisioner: rancher.io/local-path
 reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer
+volumeBindingMode: Immediate
