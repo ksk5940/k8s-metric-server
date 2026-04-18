@@ -1,5 +1,5 @@
 # =============================================================
-# Local Path Provisioner (CORRECT - Deployment based)
+# Local Path Provisioner (CORRECT FINAL VERSION)
 # =============================================================
 
 apiVersion: v1
@@ -91,7 +91,7 @@ metadata:
   name: local-path-provisioner
   namespace: local-path-storage
 spec:
-  replicas: 1
+  replicas: 1   # 🔥 VERY IMPORTANT
   selector:
     matchLabels:
       app: local-path-provisioner
