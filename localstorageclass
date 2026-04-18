@@ -1,3 +1,166 @@
 
-
 kubectl apply -f https://raw.githubusercontent.com/ksk5940/k8s-metric-server/main/localpath_storageclass.yaml
+
+LOCAL PATH STORAGE (KUBERNETES)
+
+1. WHAT IT IS
+-------------
+local-path-storage is a simple dynamic storage provisioner.
+It creates storage using the node’s local filesystem.
+
+Provisioner: rancher.io/local-path
+
+---
+
+2. HOW IT WORKS
+---------------
+Flow:
+
+PVC (request)
+   ↓
+local-path-provisioner (DaemonSet)
+   ↓
+Creates directory on node:
+   /var/local-path-provisioner/<pvc-name>
+   ↓
+Creates PersistentVolume (PV)
+   ↓
+Pod mounts that directory
+
+---
+
+3. STORAGE LOCATION
+-------------------
+All data is stored on node:
+
+/var/local-path-provisioner/
+
+Example:
+
+/var/local-path-provisioner/
+ ├── pvc-12345/
+ ├── pvc-67890/
+
+Each PVC = one folder
+
+---
+
+4. COMPONENTS
+-------------
+
+StorageClass:
+- Defines provisioner
+- Example:
+  provisioner: rancher.io/local-path
+
+DaemonSet:
+- Runs on every node
+- Required because storage is node-local
+
+ConfigMap:
+- Defines storage path
+- Contains:
+  - config.json
+  - setup script
+  - teardown script
+  - helperPod.yaml
+
+RBAC:
+- Allows access to:
+  - configmaps
+  - PVs
+  - PVCs
+  - nodes
+
+---
+
+5. LIFECYCLE
+
+PVC CREATE:
+-----------
+PVC created
+→ provisioner detects it
+→ creates directory
+→ creates PV
+→ binds PVC to PV
+
+POD START:
+----------
+Pod scheduled to node
+→ volume mounted from local path
+
+PVC DELETE:
+-----------
+teardown script runs
+→ directory removed (depends on reclaim policy)
+
+---
+
+6. IMPORTANT SETTINGS
+
+volumeBindingMode: WaitForFirstConsumer
+
+Meaning:
+- Pod is scheduled first
+- Then volume is created on that node
+
+---
+
+7. LIMITATIONS
+
+1. Node-local storage
+   Data exists only on one node
+
+2. No sharing
+   Cannot use same volume across nodes
+
+3. No high availability
+   If node dies → data lost
+
+---
+
+8. WHEN TO USE
+
+GOOD FOR:
+- Dev environments
+- Testing
+- Single-node clusters
+- Learning Kubernetes
+
+NOT FOR:
+- Production systems
+- Multi-node shared storage
+- Critical data
+
+---
+
+9. SIMPLE EXAMPLE
+
+PVC:
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+
+Result:
+Creates folder:
+  /var/local-path-provisioner/pvc-xxxxx
+
+---
+
+10. MENTAL MODEL
+
+local-path-storage =
+"mkdir on node + mount into pod"
+
+---
+
+END
