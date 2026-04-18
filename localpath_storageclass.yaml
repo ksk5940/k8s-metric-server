@@ -1,5 +1,5 @@
 # =============================================================
-# Local Path Provisioner (DaemonSet - multi-node)
+# Local Path Provisioner (CORRECT - Deployment based)
 # =============================================================
 
 apiVersion: v1
@@ -86,11 +86,12 @@ data:
         command: ["/bin/sh", "-c", "sleep 3600"]
 ---
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   name: local-path-provisioner
   namespace: local-path-storage
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: local-path-provisioner
