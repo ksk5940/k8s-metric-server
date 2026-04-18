@@ -1,3 +1,7 @@
+# =============================================================
+# Local Path Provisioner (DaemonSet - multi-node)
+# =============================================================
+
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -99,18 +103,19 @@ spec:
       containers:
         - name: local-path-provisioner
           image: rancher/local-path-provisioner:v0.0.34
+          imagePullPolicy: IfNotPresent
           command:
             - local-path-provisioner
             - start
             - --config
             - /etc/config/config.json
           volumeMounts:
-            - name: config
+            - name: config-volume
               mountPath: /etc/config/
             - name: local-storage
               mountPath: /var/local-path-provisioner
       volumes:
-        - name: config
+        - name: config-volume
           configMap:
             name: local-path-config
         - name: local-storage
