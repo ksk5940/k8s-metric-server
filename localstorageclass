@@ -1,5 +1,5 @@
 
-kubectl apply -f https://raw.githubusercontent.com/ksk5940/k8s-metric-server/main/localpath_storageclass.yaml
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
 
 LOCAL PATH STORAGE (KUBERNETES)
 
